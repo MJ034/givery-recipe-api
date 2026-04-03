@@ -10,17 +10,17 @@ const pool = mysql.createPool(process.env.DATABASE_URL);
 // GET /recipes - Fetch all
 app.get('/recipes', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM recipes');
+    const [rows] = await pool.query('SELECT id, title, making_time, serves, ingredients, cost FROM recipes');
     res.status(200).json({ recipes: rows });
   } catch (err) {
-    res.status(200).json({ message: "Failed to fetch recipes", error: err.message });
+    res.status(200).json({ message: "Failed to fetch recipes" });
   }
 });
 
 // GET /recipes/:id - Return selected recipe by id
 app.get('/recipes/:id', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT * FROM recipes WHERE id = ?', [req.params.id]);
+    const [rows] = await pool.query('SELECT id, title, making_time, serves, ingredients, cost FROM recipes');
     
     if (rows.length === 0) {
       return res.status(200).json({ message: "Recipe not found" });
@@ -31,7 +31,7 @@ app.get('/recipes/:id', async (req, res) => {
       recipe: rows
     });
   } catch (err) {
-    res.status(200).json({ message: "Error retrieving recipe" });
+    res.status(200).json({ message: "Recipe details by id" });
   }
 });
 
@@ -39,10 +39,11 @@ app.get('/recipes/:id', async (req, res) => {
 app.post("/recipes", async (req, res) => {
   const { title, making_time, serves, ingredients, cost } = req.body;
 
+  // validation for required fields
   if (!title || !making_time || !serves || !ingredients || !cost) {
     return res.status(200).json({
       message: "Recipe creation failed!",
-      required: "title, making_time, serves, ingredients, cost",
+      required: "title, making_time, serves, ingredients, cost"
     });
   }
   try {
@@ -64,7 +65,7 @@ app.post("/recipes", async (req, res) => {
       ]
     });
   } catch (err) {
-    res.status(200).json({ message: "Recipe creation failed!", error: err.message });
+    res.status(200).json({ message: "Recipe creation failed!" });
   }
 });
 
@@ -116,9 +117,8 @@ app.delete('/recipes/:id', async (req, res) => {
   }
 });
 
-
 app.use((req, res) => {
-  res.status(404).json({ message: "Endpoint not found" });
+  res.status(404).json({ message: "Not Found" });
 });
 
 const PORT = process.env.PORT || 3000;

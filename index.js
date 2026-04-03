@@ -9,7 +9,8 @@ const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   waitForConnections: true,
   connectionLimit: 10,
-  enableKeepAlive: true
+  enableKeepAlive: true,
+  decimalNumbers: true
 });
 
 // GET /recipes
@@ -54,15 +55,25 @@ app.post("/recipes", async (req, res) => {
     });
   }
   try {
+    const numericCost = Number(cost);
+  
     const [result] = await pool.query(
       'INSERT INTO recipes (title, making_time, serves, ingredients, cost) VALUES (?, ?, ?, ?, ?)',
-      [title, making_time, serves, ingredients, cost]
+      [title, making_time, serves, ingredients, String(cost)]
     );
-    res.status(200).json({
+res.status(200).json({
       message: "Recipe successfully created!",
-      recipe: [{ id: result.insertId, title, making_time, serves, ingredients, cost }]
+      recipe: [{
+        id: result.insertId,
+        title,
+        making_time,
+        serves,
+        ingredients,
+        cost: numericCost
+      }]
     });
   } catch (err) {
+    console.error("DB Error:", err.message);
     res.status(200).json({ message: "Recipe creation failed!" });
   }
 });

@@ -5,7 +5,14 @@ const mysql = require("mysql2/promise");
 const app = express();
 app.use(express.json());
 
-const pool = mysql.createPool(process.env.DATABASE_URL);
+const dbConfig = {
+  uri: process.env.DATABASE_URL,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+  enableKeepAlive: true
+};
+const pool = mysql.createPool(dbConfig);
 
 // GET /recipes - Fetch all
 app.get('/recipes', async (req, res) => {
@@ -20,8 +27,10 @@ app.get('/recipes', async (req, res) => {
 // GET /recipes/:id - Return selected recipe by id
 app.get('/recipes/:id', async (req, res) => {
   try {
-    const [rows] = await pool.query('SELECT id, title, making_time, serves, ingredients, cost FROM recipes');
-    
+    const [rows] = await pool.query(
+      'SELECT id, title, making_time, serves, ingredients, cost FROM recipes WHERE id = ?', 
+      [req.params.id]
+    );
     if (rows.length === 0) {
       return res.status(200).json({ message: "Recipe not found" });
     }

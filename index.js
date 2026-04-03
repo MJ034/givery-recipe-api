@@ -5,32 +5,31 @@ const mysql = require("mysql2/promise");
 const app = express();
 app.use(express.json());
 
-const dbConfig = {
+const pool = mysql.createPool({
   uri: process.env.DATABASE_URL,
   waitForConnections: true,
   connectionLimit: 10,
-  queueLimit: 0,
   enableKeepAlive: true
-};
-const pool = mysql.createPool(dbConfig);
+});
 
-// GET /recipes - Fetch all
+// GET /recipes
 app.get('/recipes', async (req, res) => {
   try {
     const [rows] = await pool.query('SELECT id, title, making_time, serves, ingredients, cost FROM recipes');
     res.status(200).json({ recipes: rows });
   } catch (err) {
-    res.status(200).json({ message: "Failed to fetch recipes" });
+    res.status(200).json({ recipes: [] }); 
   }
 });
 
-// GET /recipes/:id - Return selected recipe by id
+// GET /recipes/:id
 app.get('/recipes/:id', async (req, res) => {
   try {
     const [rows] = await pool.query(
-      'SELECT id, title, making_time, serves, ingredients, cost FROM recipes WHERE id = ?', 
+      'SELECT id, title, making_time, serves, ingredients, cost FROM recipes WHERE id = ?',
       [req.params.id]
     );
+    
     if (rows.length === 0) {
       return res.status(200).json({ message: "Recipe not found" });
     }
@@ -40,15 +39,14 @@ app.get('/recipes/:id', async (req, res) => {
       recipe: rows
     });
   } catch (err) {
-    res.status(200).json({ message: "Recipe details by id" });
+    res.status(200).json({ message: "Recipe details by id", recipe: [] });
   }
 });
 
-// POST /recipes - Create a new recipe
+// POST /recipes
 app.post("/recipes", async (req, res) => {
   const { title, making_time, serves, ingredients, cost } = req.body;
 
-  // validation for required fields
   if (!title || !making_time || !serves || !ingredients || !cost) {
     return res.status(200).json({
       message: "Recipe creation failed!",
@@ -62,58 +60,43 @@ app.post("/recipes", async (req, res) => {
     );
     res.status(200).json({
       message: "Recipe successfully created!",
-      recipe: [
-        {
-          id: result.insertId,
-          title,
-          making_time,
-          serves,
-          ingredients,
-          cost
-        }
-      ]
+      recipe: [{ id: result.insertId, title, making_time, serves, ingredients, cost }]
     });
   } catch (err) {
     res.status(200).json({ message: "Recipe creation failed!" });
   }
 });
 
+// PATCH /recipes/:id
 app.patch('/recipes/:id', async (req, res) => {
   try {
-    // Check if recipe exists
     const [exists] = await pool.query('SELECT * FROM recipes WHERE id = ?', [req.params.id]);
     if (exists.length === 0) return res.status(200).json({ message: "Recipe not found" });
 
-    // Update with provided fields or keep old ones
     const { title, making_time, serves, ingredients, cost } = req.body;
+    const updated = {
+      title: title || exists[0].title,
+      making_time: making_time || exists[0].making_time,
+      serves: serves || exists[0].serves,
+      ingredients: ingredients || exists[0].ingredients,
+      cost: cost !== undefined ? cost : exists[0].cost
+    };
+
     await pool.query(
       'UPDATE recipes SET title = ?, making_time = ?, serves = ?, ingredients = ?, cost = ? WHERE id = ?',
-      [
-        title || exists[0].title,
-        making_time || exists[0].making_time,
-        serves || exists[0].serves,
-        ingredients || exists[0].ingredients,
-        cost || exists[0].cost,
-        req.params.id
-      ]
+      [updated.title, updated.making_time, updated.serves, updated.ingredients, updated.cost, req.params.id]
     );
 
     res.status(200).json({
       message: "Recipe successfully updated!",
-      recipe: [{
-        id: parseInt(req.params.id),
-        title: title || exists[0].title,
-        making_time: making_time || exists[0].making_time,
-        serves: serves || exists[0].serves,
-        ingredients: ingredients || exists[0].ingredients,
-        cost: cost || exists[0].cost
-      }]
+      recipe: [{ id: parseInt(req.params.id), ...updated }]
     });
   } catch (err) {
-    res.status(200).json({ message: "Update failed", error: err.message });
+    res.status(200).json({ message: "Recipe update failed" });
   }
 });
 
+// DELETE /recipes/:id
 app.delete('/recipes/:id', async (req, res) => {
   try {
     const [exists] = await pool.query('SELECT * FROM recipes WHERE id = ?', [req.params.id]);
@@ -122,15 +105,14 @@ app.delete('/recipes/:id', async (req, res) => {
     await pool.query('DELETE FROM recipes WHERE id = ?', [req.params.id]);
     res.status(200).json({ message: "Recipe successfully removed!" });
   } catch (err) {
-    res.status(200).json({ message: "Delete failed", error: err.message });
+    res.status(200).json({ message: "Recipe deletion failed" });
   }
 });
 
+// 404 handler
 app.use((req, res) => {
   res.status(404).json({ message: "Not Found" });
 });
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () =>
-  console.log(`🚀 Server ready at http://localhost:${PORT}`),
-);
+app.listen(PORT, () => console.log(`🚀 Server ready at ${PORT}`));
